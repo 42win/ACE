@@ -1,0 +1,548 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>My Go Game Page</title>
+    <script type="text/javascript" src="wgo/wgo.min.js"></script>
+    <script type="text/javascript" src="wgo/wgo.player.min.js"></script>
+    <link type="text/css" href="wgo/wgo.player.css" rel="stylesheet" />
+    <style>
+        #board {
+            margin-top: 20px;
+        }
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: center;
+        }
+        button {
+            margin-top: 10px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WGo.js Application</h1>
+
+    <!-- Dropdown menu untuk memilih ukuran papan -->
+    <label for="boardSize">Pilih ukuran papan:</label>
+    <select id="boardSize">
+        <option value="5" selected>5x5</option>
+        <option value="6">6x6</option>
+        <option value="7">7x7</option>
+        <option value="8">8x8</option>
+        <option value="9">9x9</option>
+    </select>
+    <button id="startGame">Mulai Permainan</button>
+    <button id="passTurn">Pass</button>
+    <button id="endGame">Selesai Permainan</button>
+    <button id="backToMainPage">Back</button>
+
+    <div id="board"></div>
+
+    <table id="capturedStonesTable">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Batu</th>
+                <th>Jumlah Batu yang Dimakan</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Hitam</td>
+                <td>●</td>
+                <td id="blackCapturedCount">0</td>
+            </tr>
+            <tr>
+                <td>Putih</td>
+                <td>○</td>
+                <td id="whiteCapturedCount">0</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table id="pointsTable">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Batu Dimakan</th>
+                <th>Wilayah Kosong</th>
+                <th>Total Poin</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Hitam</td>
+                <td id="blackCapturedPoints">0</td>
+                <td id="blackTerritoryPoints">0</td>
+                <td id="blackTotalPoints">0</td>
+            </tr>
+            <tr>
+                <td>Putih</td>
+                <td id="whiteCapturedPoints">0</td>
+                <td id="whiteTerritoryPoints">0</td>
+                <td id="whiteTotalPoints">0</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Tabel untuk mencatat waktu berpikir agen -->
+    <table id="agentThinkingTimesTable">
+        <thead>
+            <tr>
+                <th>Langkah Ke-</th>
+                <th>Waktu Berpikir Agen (detik)</th>
+            </tr>
+        </thead>
+        <tbody id="agentThinkingTimesBody">
+        </tbody>
+    </table>
+
+    <script>
+        var board;
+        var currentPlayer;
+        var nextPlayer;
+
+        var gameState = []; // Array 2D untuk melacak status permainan
+
+        var capturedStonesCount = {
+            black: 0,
+            white: 0
+        };
+
+        var points = {
+            black: {
+                captured: 0,
+                territory: 0
+            },
+            white: {
+                captured: 0,
+                territory: 0
+            }
+        };
+
+        var passCount = 0;
+
+        // Variabel untuk mencatat waktu berpikir agen
+        var agentStartTime;
+        var agentThinkingTimes = [];
+        var agentMoveNumber = 0;
+
+        document.getElementById("startGame").addEventListener("click", function() {
+            var size = parseInt(document.getElementById("boardSize").value);
+            initializeBoard(size);
+        });
+
+        document.getElementById("passTurn").addEventListener("click", function() {
+            passCount++;
+            if (passCount >= 2) {
+                calculateTerritoryPoints();
+                updatePointsTable();
+                declareWinner();
+            } else {
+                [currentPlayer, nextPlayer] = [nextPlayer, currentPlayer];
+                if (currentPlayer === WGo.W) {
+                    agentStartTime = performance.now(); // Mulai catat waktu berpikir agen
+                    setTimeout(makeBestMove, 500);
+                }
+            }
+        });
+
+        document.getElementById("endGame").addEventListener("click", function() {
+            calculateTerritoryPoints();
+            updatePointsTable();
+            declareWinner();
+        });
+
+        document.getElementById("backToMainPage").addEventListener("click", function() { 
+            window.location.href = "/";
+        });
+
+        function declareWinner() {
+            var blackTotalPoints = points.black.captured + points.black.territory;
+            var whiteTotalPoints = points.white.captured + points.white.territory;
+
+            if (blackTotalPoints > whiteTotalPoints) {
+                alert("Permainan selesai! Hitam menang dengan total poin " + blackTotalPoints + " melawan " + whiteTotalPoints + ".");
+            } else if (whiteTotalPoints > blackTotalPoints) {
+                alert("Permainan selesai! Putih menang dengan total poin " + whiteTotalPoints + " melawan " + blackTotalPoints + ".");
+            } else {
+                alert("Permainan selesai! Hasil seri dengan masing-masing " + blackTotalPoints + " poin.");
+            }
+        }
+
+        function initializeBoard(size) {
+            document.getElementById("board").innerHTML = '';
+
+            board = new WGo.Board(document.getElementById("board"), {
+                width: 500,
+                size: size,
+                section: {
+                    top: -1,
+                    left: -1,
+                    right: -1,
+                    bottom: -1,
+                }
+            });
+
+            currentPlayer = WGo.B;
+            nextPlayer = WGo.W;
+            passCount = 0;
+            capturedStonesCount = {
+                black: 0,
+                white: 0
+            };
+            points = {
+                black: {
+                    captured: 0,
+                    territory: 0
+                },
+                white: {
+                    captured: 0,
+                    territory: 0
+                }
+            };
+            agentThinkingTimes = [];
+            agentMoveNumber = 0;
+            updateCapturedStonesTable();
+            updatePointsTable();
+            clearAgentThinkingTimesTable(); // Bersihkan tabel waktu agen
+            setupClickListener();
+
+            // Inisialisasi gameState
+            gameState = [];
+            for (let i = 0; i < size; i++) {
+                gameState[i] = [];
+                for (let j = 0; j < size; j++) {
+                    gameState[i][j] = 0; // 0 untuk kosong, 1 untuk hitam, 2 untuk putih
+                }
+            }
+        }
+
+        function setupClickListener() {
+            board.addEventListener("click", function(x, y) { 
+                if (currentPlayer !== WGo.B) return; // Hanya menerima input jika giliran pemain
+                if (isValidMove(x, y)) {
+                    board.addObject({ x: x, y: y, c: currentPlayer });
+                    gameState[x][y] = currentPlayer === WGo.B ? 1 : 2;
+
+                    let stonesCaptured = captureStones(currentPlayer === WGo.B ? 2 : 1);
+
+                    updateCapturedStonesTable();
+
+                    passCount = 0; // Reset passCount karena pemain melakukan langkah
+
+                    // Tambahkan pemanggilan fungsi di sini
+                    calculateTerritoryPoints();
+                    updatePointsTable();
+
+                    [currentPlayer, nextPlayer] = [nextPlayer, currentPlayer];
+                    if (currentPlayer === WGo.W) {
+                        agentStartTime = performance.now(); // Mulai catat waktu berpikir agen
+                        setTimeout(makeBestMove, 500);
+                    }
+                }
+            });
+        }
+
+        function isValidMove(x, y) {
+            if (gameState[x][y] !== 0) return false;
+            if (isSuicideMove(x, y, currentPlayer)) return false;
+            return true;
+        }
+
+        function isSuicideMove(x, y, player) {
+            var tempGameState = gameState.map(arr => arr.slice());
+            tempGameState[x][y] = player === WGo.B ? 1 : 2;
+            var liberties = calculateLiberties(x, y, tempGameState);
+            return liberties === 0;
+        }
+
+        function calculateLiberties(x, y, state) {
+            var visited = new Set();
+            var liberties = exploreLiberties(x, y, state, visited);
+            return liberties;
+        }
+
+        function exploreLiberties(x, y, state, visited) {
+            var liberties = 0;
+            var color = state[x][y];
+            var stack = [{ x, y }];
+
+            while (stack.length > 0) {
+                var pos = stack.pop();
+                var key = `${pos.x},${pos.y}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+
+                var directions = [
+                    { dx: -1, dy: 0 },
+                    { dx: 1, dy: 0 },
+                    { dx: 0, dy: -1 },
+                    { dx: 0, dy: 1 }
+                ];
+
+                directions.forEach(function(dir) {
+                    var nx = pos.x + dir.dx;
+                    var ny = pos.y + dir.dy;
+
+                    if (nx >= 0 && nx < state.length && ny >= 0 && ny < state.length) {
+                        if (state[nx][ny] === 0) {
+                            liberties++;
+                        } else if (state[nx][ny] === color) {
+                            stack.push({ x: nx, y: ny });
+                        }
+                    }
+                });
+            }
+
+            return liberties;
+        }
+
+        function captureStones(enemyColor) {
+            var size = board.size;
+            var stonesToRemove = [];
+            var stonesCaptured = 0;
+
+            var tempGameState = gameState.map(arr => arr.slice());
+
+            for (let x = 0; x < size; x++) {
+                for (let y = 0; y < size; y++) {
+                    if (tempGameState[x][y] === enemyColor) {
+                        var liberties = calculateLiberties(x, y, tempGameState);
+                        if (liberties === 0) {
+                            var group = getConnectedGroup(x, y, tempGameState);
+                            group.forEach(function(stone) {
+                                stonesToRemove.push({ x: stone.x, y: stone.y, color: enemyColor });
+                                tempGameState[stone.x][stone.y] = 0;
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (stonesToRemove.length > 0) {
+                stonesToRemove.forEach(function(stone) {
+                    board.removeObject({ x: stone.x, y: stone.y });
+                    gameState[stone.x][stone.y] = 0;
+                    stonesCaptured++;
+
+                    // Tambahkan 1 poin untuk setiap batu yang dimakan
+                    if (stone.color === 1) {
+                        capturedStonesCount.white++;
+                        points.white.captured++;
+                    } else {
+                        capturedStonesCount.black++;
+                        points.black.captured++;
+                    }
+                });
+            }
+            return stonesCaptured;
+        }
+
+        function getConnectedGroup(x, y, state) {
+            var group = [];
+            var color = state[x][y];
+            var visited = new Set();
+            var stack = [{ x, y }];
+
+            while (stack.length > 0) {
+                var pos = stack.pop();
+                var key = `${pos.x},${pos.y}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+                group.push(pos);
+
+                var directions = [
+                    { dx: -1, dy: 0 },
+                    { dx: 1, dy: 0 },
+                    { dx: 0, dy: -1 },
+                    { dx: 0, dy: 1 }
+                ];
+
+                directions.forEach(function(dir) {
+                    var nx = pos.x + dir.dx;
+                    var ny = pos.y + dir.dy;
+
+                    if (nx >= 0 && nx < state.length && ny >= 0 && ny < state.length) {
+                        if (state[nx][ny] === color) {
+                            var nKey = `${nx},${ny}`;
+                            if (!visited.has(nKey)) {
+                                stack.push({ x: nx, y: ny });
+                            }
+                        }
+                    }
+                });
+            }
+
+            return group;
+        }
+
+        function updateCapturedStonesTable() {
+            document.getElementById("blackCapturedCount").innerText = capturedStonesCount.black;
+            document.getElementById("whiteCapturedCount").innerText = capturedStonesCount.white;
+        }
+
+        function updatePointsTable() {
+            document.getElementById("blackCapturedPoints").innerText = points.black.captured;
+            document.getElementById("whiteCapturedPoints").innerText = points.white.captured;
+            document.getElementById("blackTerritoryPoints").innerText = points.black.territory;
+            document.getElementById("whiteTerritoryPoints").innerText = points.white.territory;
+            document.getElementById("blackTotalPoints").innerText = points.black.captured + points.black.territory;
+            document.getElementById("whiteTotalPoints").innerText = points.white.captured + points.white.territory;
+        }
+
+        function makeBestMove() {
+            // Hitung waktu berpikir agen
+            var agentEndTime = performance.now();
+            var thinkingTime = ((agentEndTime - agentStartTime) / 1000).toFixed(2); // Dalam detik
+            agentMoveNumber++;
+            agentThinkingTimes.push(thinkingTime);
+            updateAgentThinkingTimesTable();
+
+            // Langkah sederhana: pilih langkah acak yang valid
+            var validMoves = [];
+            for (let x = 0; x < gameState.length; x++) {
+                for (let y = 0; y < gameState.length; y++) {
+                    if (isValidMove(x, y)) {
+                        validMoves.push({ x, y });
+                    }
+                }
+            }
+
+            if (validMoves.length > 0) {
+                var move = validMoves[Math.floor(Math.random() * validMoves.length)];
+                board.addObject({ x: move.x, y: move.y, c: currentPlayer });
+                gameState[move.x][move.y] = currentPlayer === WGo.B ? 1 : 2;
+
+                let stonesCaptured = captureStones(currentPlayer === WGo.B ? 2 : 1);
+
+                updateCapturedStonesTable();
+
+                // Tambahkan pemanggilan fungsi di sini
+                calculateTerritoryPoints();
+                updatePointsTable();
+
+                passCount = 0; // Reset passCount karena AI melakukan langkah
+
+                [currentPlayer, nextPlayer] = [nextPlayer, currentPlayer];
+
+                // Jika giliran kembali ke AI, panggil makeBestMove() lagi
+                if (currentPlayer === WGo.W) {
+                    agentStartTime = performance.now(); // Mulai catat waktu berpikir agen
+                    setTimeout(makeBestMove, 500);
+                }
+            } else {
+                // AI melakukan pass
+                passCount++;
+                if (passCount >= 2) {
+                    calculateTerritoryPoints();
+                    updatePointsTable();
+                    declareWinner();
+                    return;
+                } else {
+                    [currentPlayer, nextPlayer] = [nextPlayer, currentPlayer];
+                    return;
+                }
+            }
+        }
+
+        function updateAgentThinkingTimesTable() {
+            var tableBody = document.getElementById("agentThinkingTimesBody");
+            var newRow = document.createElement("tr");
+
+            var moveNumberCell = document.createElement("td");
+            moveNumberCell.innerText = agentMoveNumber;
+
+            var thinkingTimeCell = document.createElement("td");
+            thinkingTimeCell.innerText = agentThinkingTimes[agentThinkingTimes.length - 1];
+
+            newRow.appendChild(moveNumberCell);
+            newRow.appendChild(thinkingTimeCell);
+            tableBody.appendChild(newRow);
+        }
+
+        function clearAgentThinkingTimesTable() {
+            var tableBody = document.getElementById("agentThinkingTimesBody");
+            tableBody.innerHTML = '';
+        }
+
+        function calculateTerritoryPoints() {
+            var size = board.size;
+            var visited = new Set();
+            points.black.territory = 0;
+            points.white.territory = 0;
+
+            for (let x = 0; x < size; x++) {
+                for (let y = 0; y < size; y++) {
+                    var key = `${x},${y}`;
+                    if (!visited.has(key) && gameState[x][y] === 0) {
+                        // Mulai flood-fill dari titik kosong ini
+                        var emptyRegion = [];
+                        var surroundingColors = new Set();
+                        floodFillEmptyRegion(x, y, emptyRegion, surroundingColors, visited);
+                        // Tentukan pemain yang mengelilingi wilayah ini
+                        if (surroundingColors.size === 1) {
+                            var color = [...surroundingColors][0];
+                            if (color === 1) {
+                                points.black.territory += emptyRegion.length;
+                            } else if (color === 2) {
+                                points.white.territory += emptyRegion.length;
+                            }
+                        }
+                        // Jika dikelilingi oleh dua warna, tidak ada poin
+                    }
+                }
+            }
+        }
+
+        function floodFillEmptyRegion(x, y, emptyRegion, surroundingColors, visited) {
+            var size = gameState.length;
+            var stack = [{ x, y }];
+
+            while (stack.length > 0) {
+                var pos = stack.pop();
+                var key = `${pos.x},${pos.y}`;
+
+                if (visited.has(key)) continue;
+                visited.add(key);
+
+                if (pos.x < 0 || pos.x >= size || pos.y < 0 || pos.y >= size) {
+                    continue;
+                }
+
+                if (gameState[pos.x][pos.y] === 0) {
+                    emptyRegion.push({ x: pos.x, y: pos.y });
+
+                    var directions = [
+                        { dx: -1, dy: 0 },
+                        { dx: 1, dy: 0 },
+                        { dx: 0, dy: -1 },
+                        { dx: 0, dy: 1 }
+                    ];
+
+                    directions.forEach(function(dir) {
+                        var nx = pos.x + dir.dx;
+                        var ny = pos.y + dir.dy;
+                        var nKey = `${nx},${ny}`;
+                        if (nx >= 0 && nx < size && ny >= 0 && ny < size && !visited.has(nKey)) {
+                            stack.push({ x: nx, y: ny });
+                        }
+                    });
+                } else {
+                    // Batu
+                    surroundingColors.add(gameState[pos.x][pos.y]);
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>

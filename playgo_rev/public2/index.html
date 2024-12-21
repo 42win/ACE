@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Game (5x5)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Go Game (5x5)</h1>
+    <div id="board"></div>
+    <h2 id="status">Current Player: Black</h2>
+    <h2 id="score">Score - Black: 0, White: 0</h2>
+    <button id="reset">Reset Game</button>
+    <button id="backToMainPage">Back</button>
+
+    <script src="script.js"></script>
+    <script>
+        // Tambahkan event listener untuk tombol
+        document.getElementById("backToMainPage").addEventListener("click", function () {
+            // Arahkan ke halaman utama
+            window.location.href = "/"; // Ganti URL sesuai kebutuhan
+        });
+    </script>
+</body>
+</html>

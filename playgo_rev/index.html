@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Play-Go</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            margin-top: 50px;
+            font-size: 48px;
+            color: #333;
+        }
+        .image-container {
+            margin: 20px auto;
+        }
+        .button-container {
+            margin-top: 50px;
+        }
+        button {
+            padding: 20px 40px;
+            margin: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .rule-based {
+            background-color: #4caf50;
+            color: white;
+        }
+        .rule-based:hover {
+            background-color: #45a049;
+        }
+        .min-max {
+            background-color: #2196f3;
+            color: white;
+        }
+        .min-max:hover {
+            background-color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Game Play-Go</h1>
+    <div class="image-container">
+        <img src="/media/playgo.png" alt="Game Board" style="width: 200px; height: auto; border-radius: 10px;">
+    </div>
+    <div class="button-container">
+        <button class="rule-based" onclick="showRuleBased()">Algoritma Rule-Based</button>
+        <button class="min-max" onclick="showMinMax()">Algoritma Min-Max</button>
+    </div>
+
+    <script>
+        function showRuleBased() {
+            // alert("Anda memilih Algoritma Rule-Based. Memulai...");
+            window.location.href = "/rulebased";
+        }
+
+        function showMinMax() {
+            // alert("Anda memilih Algoritma Min-Max. Memulai...");
+            window.location.href = "/minmax";
+        }
+    </script>
+</body>
+</html>

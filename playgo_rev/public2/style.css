@@ -1,0 +1,32 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+#board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* Update to 5 columns for 5x5 board */
+    width: 500px; /* Adjust based on desired board size */
+    height: 500px; /* Adjust based on desired board size */
+}
+
+.cell {
+    border: 1px solid black; /* Cell styling */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px; /* Adjust font size if needed */
+}
+
+.cell:hover {
+    background-color: #f0f0f0; /* Change color on hover */
+}
+
+/* Style for black and white stones */
+.cell[data-color="black"] {
+    color: black; /* Black stone text color */
+}
+
+.cell[data-color="white"] {
+    color: black; /* Set white stone text color to black for visibility */
+}
